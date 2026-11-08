@@ -8,6 +8,7 @@ from app.exceptions import (
     BloqueioJaLiberado,
     BloqueioNaoEncontrado,
     EstoqueInsuficiente,
+    ProdutoIdInvalido,
     ProdutoNaoEncontrado,
     QuantidadeInvalida,
     ReservaJaLiberada,
@@ -249,52 +250,55 @@ def test_listar_bloqueios_com_filtro_de_ativos(db):
     assert [b.id for b in services.listar_bloqueios(db, SKU, apenas_ativos=True)] == [b2.id]
 
 
-def test_listar_produtos_pagina_por_cursor(db):
-    for sku in ["SKU-A", "SKU-B", "SKU-C", "SKU-D", "SKU-E"]:
+def test_listar_produtos_ordenado_por_id_e_respeita_o_limite(db):
+    for sku in ["SKU-C", "SKU-A", "SKU-B"]:
         services.entrada(db, sku, 1)
-
-    pagina1, proximo = services.listar_produtos(db, limite=2)
-    assert [p.id for p in pagina1] == ["SKU-A", "SKU-B"]
-    assert proximo == "SKU-B"
-
-    pagina2, proximo = services.listar_produtos(db, limite=2, depois_de=proximo)
-    assert [p.id for p in pagina2] == ["SKU-C", "SKU-D"]
-    assert proximo == "SKU-D"
-
-    pagina3, proximo = services.listar_produtos(db, limite=2, depois_de=proximo)
-    assert [p.id for p in pagina3] == ["SKU-E"]
-    assert proximo is None  # última página
-
-
-def test_listar_produtos_pagina_exata_nao_tem_proxima(db):
-    services.entrada(db, "SKU-A", 1)
-    services.entrada(db, "SKU-B", 1)
-    produtos, proximo = services.listar_produtos(db, limite=2)
-    assert [p.id for p in produtos] == ["SKU-A", "SKU-B"]
-    assert proximo is None
-
-
-def test_listar_produtos_filtra_por_prefixo(db):
-    for sku in ["CAM-1", "CAM-2", "SAP-1"]:
-        services.entrada(db, sku, 1)
-    produtos, _ = services.listar_produtos(db, prefixo="CAM")
-    assert [p.id for p in produtos] == ["CAM-1", "CAM-2"]
-    # "%" é tratado como texto comum, não como curinga do LIKE
-    assert services.listar_produtos(db, prefixo="%")[0] == []
+    assert [p.id for p in services.listar_produtos(db)] == ["SKU-A", "SKU-B", "SKU-C"]
+    assert [p.id for p in services.listar_produtos(db, limite=2)] == ["SKU-A", "SKU-B"]
 
 
 def test_listar_produtos_traz_as_quantidades(db):
     services.entrada(db, SKU, 10)
     services.reservar(db, SKU, 4, "PED-1")
     services.bloquear(db, SKU, 1)
-    produtos, _ = services.listar_produtos(db)
-    conferir(produtos[0], 10, 5, 4, 1)
+    conferir(services.listar_produtos(db)[0], 10, 5, 4, 1)
 
 
 def test_listar_produtos_sem_dados_e_limite_invalido(db):
-    assert services.listar_produtos(db) == ([], None)
-    with pytest.raises(ValueError):
-        services.listar_produtos(db, limite=0)
+    assert services.listar_produtos(db) == []
+    for limite in [0, -1, 51]:
+        with pytest.raises(ValueError):
+            services.listar_produtos(db, limite=limite)
+
+
+# ------------------------------------------------------------------ identificador do produto
+
+@pytest.mark.parametrize(
+    "produto_id",
+    [
+        "teste teste",  # espaço no meio
+        " SKU-1",
+        "SKU-1 ",
+        "SKU-1\n",  # quebra de linha no final
+        "SKU.1",
+        "SKU/1",
+        "SKÚ-1",  # acento
+        "<script>",
+        "x';DROP--",
+        "x'; DROP TABLE produtos;--",
+        "a" * 65,  # maior que 64
+        "",
+    ],
+)
+def test_entrada_rejeita_id_de_produto_invalido_e_nao_cria_o_produto(db, produto_id):
+    with pytest.raises(ProdutoIdInvalido):
+        services.entrada(db, produto_id, 1)
+    assert services.listar_produtos(db) == []
+
+
+@pytest.mark.parametrize("produto_id", ["SKU-001", "sku_001", "ABC123", "a" * 64])
+def test_entrada_aceita_id_de_produto_valido(db, produto_id):
+    assert services.entrada(db, produto_id, 1).id == produto_id
 
 
 # ------------------------------------------------------------------ concorrência

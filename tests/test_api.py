@@ -130,31 +130,40 @@ def test_listar_reservas_e_bloqueios_do_produto(client):
     assert client.get("/produtos/NAO-EXISTE/bloqueios").status_code == 404
 
 
-def test_listar_produtos_paginado(client):
-    for sku in ["SKU-A", "SKU-B", "SKU-C"]:
+def test_listar_produtos(client):
+    for sku in ["SKU-B", "SKU-A", "SKU-C"]:
         client.post(f"/produtos/{sku}/entrada", json={"quantidade": 5})
     client.post("/produtos/SKU-A/reservas", json={"quantidade": 2, "solicitacao_id": "PED-1"})
 
-    pagina1 = client.get("/produtos", params={"limite": 2}).json()
-    assert [p["id"] for p in pagina1["itens"]] == ["SKU-A", "SKU-B"]
-    assert pagina1["itens"][0] == {"id": "SKU-A", "total": 5, "disponivel": 3, "reservada": 2, "bloqueada": 0}
-    assert pagina1["proximo"] == "SKU-B"
+    todos = client.get("/produtos").json()
+    assert [p["id"] for p in todos] == ["SKU-A", "SKU-B", "SKU-C"]
+    assert todos[0] == {"id": "SKU-A", "total": 5, "disponivel": 3, "reservada": 2, "bloqueada": 0}
 
-    pagina2 = client.get("/produtos", params={"limite": 2, "depois_de": pagina1["proximo"]}).json()
-    assert [p["id"] for p in pagina2["itens"]] == ["SKU-C"]
-    assert pagina2["proximo"] is None
+    dois = client.get("/produtos", params={"limite": 2}).json()
+    assert [p["id"] for p in dois] == ["SKU-A", "SKU-B"]
 
 
-def test_listar_produtos_filtra_por_prefixo(client):
-    for sku in ["CAM-1", "CAM-2", "SAP-1"]:
-        client.post(f"/produtos/{sku}/entrada", json={"quantidade": 1})
-    resposta = client.get("/produtos", params={"prefixo": "CAM"}).json()
-    assert [p["id"] for p in resposta["itens"]] == ["CAM-1", "CAM-2"]
-
-
-@pytest.mark.parametrize("limite", [0, -1, 101])
+@pytest.mark.parametrize("limite", [0, -1, 51])
 def test_listar_produtos_rejeita_limite_invalido(client, limite):
     assert client.get("/produtos", params={"limite": limite}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "produto_id",
+    [
+        "teste%20teste",  # espaço
+        "SKU.001",
+        "x%27%3BDROP--",  # x';DROP--
+        "x%27%3B%20DROP%20TABLE%20produtos%3B--",  # x'; DROP TABLE produtos;--
+        "%3Cscript%3E",  # <script>
+        "SK%C3%9A-1",  # acento
+        "a" * 65,  # maior que 64
+    ],
+)
+def test_id_de_produto_invalido_retorna_422_e_nao_cria_produto(client, produto_id):
+    assert client.post(f"/produtos/{produto_id}/entrada", json={"quantidade": 1}).status_code == 422
+    assert client.get(f"/produtos/{produto_id}").status_code == 422
+    assert client.get("/produtos").json() == []
 
 
 def test_swagger_usa_os_nomes_do_case(client):

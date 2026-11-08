@@ -14,6 +14,7 @@ from app.exceptions import (
     BloqueioNaoEncontrado,
     ErroDeDominio,
     EstoqueInsuficiente,
+    ProdutoIdInvalido,
     ProdutoNaoEncontrado,
     QuantidadeInvalida,
     ReservaJaLiberada,
@@ -41,6 +42,7 @@ STATUS_HTTP = {
     ReservaJaLiberada: 409,
     BloqueioJaLiberado: 409,
     QuantidadeInvalida: 422,
+    ProdutoIdInvalido: 422,
 }
 
 

@@ -11,6 +11,7 @@ Padrão de toda operação que altera o estoque:
     4. alterar
     5. commit (ainda dentro do lock)
 """
+import re
 import threading
 
 from sqlalchemy import select
@@ -20,6 +21,7 @@ from app.exceptions import (
     BloqueioJaLiberado,
     BloqueioNaoEncontrado,
     EstoqueInsuficiente,
+    ProdutoIdInvalido,
     ProdutoNaoEncontrado,
     QuantidadeInvalida,
     ReservaJaLiberada,
@@ -34,6 +36,15 @@ from app.models import (
     agora_utc,
 )
 
+# Identificador do produto (SKU): só letras, números, hífen e sublinhado, sem espaços, de 1 a 64 caracteres.
+# É uma lista de caracteres PERMITIDOS (allowlist): tudo que não está nela é recusado.
+# A proteção principal contra SQL injection é o SQLAlchemy, que sempre envia os valores como parâmetros
+# e nunca os concatena no SQL. Esta validação é uma segunda camada de defesa.
+PADRAO_PRODUTO_ID = r"^[A-Za-z0-9_-]{1,64}$"
+
+# Teto da listagem de produtos (a paginação completa fica como evolução).
+LIMITE_MAXIMO_LISTAGEM = 50
+
 # Concorrência: "ler o disponível e depois alterar" não é atômico. Sem proteção, duas
 # requisições simultâneas poderiam ler disponível = 10 e as duas reservarem 8.
 # Este lock faz uma operação por vez enxergar o resultado da anterior.
@@ -46,6 +57,12 @@ def _validar_quantidade(quantidade) -> None:
     # type(...) is not int também rejeita True/False (bool é subclasse de int) e floats.
     if type(quantidade) is not int or quantidade <= 0:
         raise QuantidadeInvalida(quantidade)
+
+
+def _validar_produto_id(produto_id) -> None:
+    # fullmatch exige que a string INTEIRA case com o padrão (inclusive recusa "SKU-1\n").
+    if not isinstance(produto_id, str) or not re.fullmatch(PADRAO_PRODUTO_ID, produto_id):
+        raise ProdutoIdInvalido()
 
 
 def _buscar_produto(db: Session, produto_id: str) -> Produto:
@@ -63,8 +80,10 @@ def _exigir_disponivel(produto: Produto, quantidade: int) -> None:
 # ---------------------------------------------------------------- Entrada e Saída
 
 def entrada(db: Session, produto_id: str, quantidade: int) -> Produto:
-    """Soma ao total. Se o produto não existe, ele é criado (não há função de cadastro)."""
+    """Soma ao total. Se o produto não existe, ele é criado (não há função de cadastro).
+    Como é o único ponto que cria produtos, é aqui que o formato do id é exigido."""
     _validar_quantidade(quantidade)
+    _validar_produto_id(produto_id)
     with _lock:
         produto = db.get(Produto, produto_id)
         if produto is None:
@@ -170,28 +189,13 @@ def consultar_bloqueio(db: Session, bloqueio_id: str) -> Bloqueio:
 
 # ---------------------------------------------------------------- Listagens (funcionalidades novas)
 
-def listar_produtos(
-    db: Session, limite: int = 50, depois_de: str | None = None, prefixo: str | None = None
-) -> tuple[list[Produto], str | None]:
-    """Uma página de produtos ordenada por id (paginação por cursor).
-
-    `depois_de` é o último id da página anterior; `prefixo` filtra pelo início do id.
-    Devolve (produtos, proximo): `proximo` é o cursor da próxima página, ou None na última.
-    """
-    if limite < 1:
-        raise ValueError("limite deve ser maior ou igual a 1")
-    consulta = select(Produto).order_by(Produto.id).limit(limite + 1)  # +1 só para saber se há próxima página
-    if depois_de is not None:
-        consulta = consulta.where(Produto.id > depois_de)
-    if prefixo:
-        consulta = consulta.where(Produto.id.startswith(prefixo, autoescape=True))
+def listar_produtos(db: Session, limite: int = LIMITE_MAXIMO_LISTAGEM) -> list[Produto]:
+    """Os primeiros produtos, ordenados por id, no máximo `limite` (de 1 a 50).
+    Versão simples: a paginação completa fica como evolução."""
+    if not 1 <= limite <= LIMITE_MAXIMO_LISTAGEM:
+        raise ValueError(f"limite deve estar entre 1 e {LIMITE_MAXIMO_LISTAGEM}")
     with _lock:  # mesmo motivo do consultar_produto: valores lidos do mesmo instante
-        produtos = list(db.scalars(consulta))
-    proximo = None
-    if len(produtos) > limite:  # veio o item extra: existe próxima página
-        produtos = produtos[:limite]
-        proximo = produtos[-1].id
-    return produtos, proximo
+        return list(db.scalars(select(Produto).order_by(Produto.id).limit(limite)))
 
 
 def listar_reservas(db: Session, produto_id: str, apenas_ativas: bool = False) -> list[Reserva]:

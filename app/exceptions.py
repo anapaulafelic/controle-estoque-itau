@@ -10,6 +10,14 @@ class QuantidadeInvalida(ErroDeDominio):
         super().__init__(f"Quantidade inválida: {quantidade!r}. Informe um inteiro maior que zero.")
 
 
+class ProdutoIdInvalido(ErroDeDominio):
+    def __init__(self):
+        super().__init__(
+            "Identificador de produto inválido. Use apenas letras, números, hífen e sublinhado "
+            "(até 64 caracteres), sem espaços."
+        )
+
+
 class ProdutoNaoEncontrado(ErroDeDominio):
     def __init__(self, produto_id):
         super().__init__(f"Produto '{produto_id}' não encontrado.")

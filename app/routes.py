@@ -16,12 +16,14 @@ router = APIRouter()
 Db = Annotated[Session, Depends(get_db)]
 ProdutoId = Annotated[
     str,
-    Path(min_length=1, max_length=64, description="Identificador (SKU) do produto", examples=["SKU-001"]),
+    Path(
+        pattern=services.PADRAO_PRODUTO_ID,  # mesmo padrão que o serviço exige na Entrada
+        description="Identificador (SKU) do produto: letras, números, hífen e sublinhado, sem espaços (até 64). Ex.: SKU-001",
+        json_schema_extra={"example": "SKU-001"},  # um único exemplo: o Swagger preenche o campo, sem seletor
+    ),
 ]
 ReservaId = Annotated[str, Path(description="Identificador da reserva")]
 BloqueioId = Annotated[str, Path(description="Identificador do bloqueio")]
-
-LIMITE_MAXIMO_PAGINA = 100  # teto de itens por página, para nenhuma consulta varrer a tabela inteira
 
 # Respostas de erro documentadas no Swagger.
 NAO_ENCONTRADO = {"model": schemas.ErroOut, "description": "Produto, reserva ou bloqueio não encontrado"}
@@ -67,22 +69,21 @@ def consultar_produto(produto_id: ProdutoId, db: Db):
 
 @router.get(
     "/produtos",
-    response_model=schemas.PaginaProdutos,
+    response_model=list[schemas.ResumoProduto],
     tags=["Estoque"],
     summary="Listar produtos",
 )
 def listar_produtos(
     db: Db,
-    limite: Annotated[int, Query(ge=1, le=LIMITE_MAXIMO_PAGINA, description="Itens por página")] = 50,
-    depois_de: Annotated[str | None, Query(description="Cursor: o `proximo` da página anterior")] = None,
-    prefixo: Annotated[str | None, Query(description="Só produtos cujo id começa com este texto")] = None,
+    limite: Annotated[
+        int, Query(ge=1, le=services.LIMITE_MAXIMO_LISTAGEM, description="Quantidade de itens (de 1 a 50)")
+    ] = services.LIMITE_MAXIMO_LISTAGEM,
 ):
-    """Lista os produtos com suas quantidades, ordenados por id (paginado).
+    """Lista os primeiros produtos, ordenados por id, com suas quantidades.
 
-    Para avançar, envie em `depois_de` o `proximo` devolvido. Quando `proximo` vier nulo, acabaram as páginas.
+    Versão simples, sem paginação completa (evolução prevista): devolve no máximo `limite` itens.
     """
-    produtos, proximo = services.listar_produtos(db, limite, depois_de, prefixo)
-    return {"itens": produtos, "proximo": proximo}
+    return services.listar_produtos(db, limite)
 
 
 # ------------------------------------------------------------------ Reservas

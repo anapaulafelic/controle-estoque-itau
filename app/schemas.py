@@ -48,14 +48,6 @@ class ResumoProduto(BaseModel):
     bloqueada: int
 
 
-class PaginaProdutos(BaseModel):
-    itens: list[ResumoProduto]
-    proximo: str | None = Field(
-        default=None,
-        description="Envie este valor em `depois_de` para buscar a próxima página. Nulo na última página.",
-    )
-
-
 class ReservaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

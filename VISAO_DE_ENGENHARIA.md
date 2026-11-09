@@ -32,7 +32,7 @@ pedidos simultâneos disputando 30 unidades, e ele falha se a trava for removida
 **Por que importa.** A solução já passou por uma mudança grande (separar reserva e bloqueio). Sem testes, mexer em
 algo central é arriscado. E qualidade não é ter muitos testes: é ter testes capazes de **perceber** um defeito.
 
-**O que a solução faz hoje.** 113 casos, cada um com um banco novo. Eles cobrem o caminho normal, os erros, o que
+**O que a solução faz hoje.** 122 casos, cada um com um banco novo. Eles cobrem o caminho normal, os erros, o que
 acontece com o estoque depois de uma operação recusada, a liberação repetida e os pedidos simultâneos. O arquivo
 [`TESTES.md`](TESTES.md) tem uma lista de defeitos para criar de propósito no código e conferir que algum teste falha.
 

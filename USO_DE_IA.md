@@ -66,7 +66,7 @@ ficou com um único parâmetro, `limite`.
 > isolado para os testes e explique o objetivo de cada caso.
 
 **Impacto:** apontou lacunas reais nos testes e um defeito no código (ver a análise abaixo). Depois perguntei se a
-quantidade de testes não seria exagerada e pedi para manter o simples: a suíte foi reduzida de 196 para 113 casos.
+quantidade de testes não seria exagerada e pedi para manter o simples: a suíte foi reduzida de 196 para 113 casos (hoje são 122, depois do limite de quantidade).
 
 ## Análise
 
@@ -92,7 +92,7 @@ quantidade de testes não seria exagerada e pedi para manter o simples: a suíte
   com a sua liberação.
 - **Quantidade e escolha dos testes.** A IA chegou a 196 casos, com técnicas que eu não conseguiria explicar bem
   (leitura do banco por SQL direto, sequência de operações sorteadas, testes das regras do banco). Achei
-  desproporcional para um case de 3 horas e pedi para manter o simples. Ficaram 113 casos, e mantive os testes
+  desproporcional para um case de 3 horas e pedi para manter o simples. Ficaram 113 casos na época, e mantive os testes
   principais, que consigo defender: as regras do enunciado, os erros, a consistência depois de uma operação recusada,
   a liberação repetida e os pedidos simultâneos.
 - **Paginação completa na listagem de produtos.** Simplifiquei para um parâmetro `limite` de até 50, por pragmatismo.
@@ -114,10 +114,11 @@ quantidade de testes não seria exagerada e pedi para manter o simples: a suíte
   trava for removida.
 - **Validação só na entrada.** Os testes conferiam quantidade inválida apenas na entrada, então `saida(-1)` poderia
   aumentar o estoque sem que nenhum teste percebesse. Foi corrigido com testes nas quatro operações.
-- **Defeito no código encontrado pela revisão.** Uma quantidade acima de 2⁶³−1 passa na validação e estoura no
-  SQLite. Está registrado como `xfail` e na lista de melhorias do README.
+- **Defeito no código encontrado pela revisão.** Uma quantidade acima de 2⁶³−1 passava na validação e estourava no
+  SQLite (erro 500). Primeiro foi registrado como teste de "falha esperada"; depois foi corrigido com um limite de
+  1.000.000 unidades por operação, e os testes passaram a verificar o limite.
 - **A IA não executava o projeto.** O ambiente dela não tinha FastAPI nem SQLAlchemy, então toda execução real dos
-  testes foi minha: 38 passaram na primeira versão e 112 passaram e 1 `xfailed` na versão final. A IA só validou a
+  testes foi minha: 38 passaram na primeira versão e 112 passaram (mais 1 de "falha esperada") na versão anterior ao limite de quantidade. A IA só validou a
   lógica dos testes contra um modelo em memória.
 - **Exemplo no Swagger.** A primeira tentativa de mostrar um valor de exemplo no id do produto gerou um seletor
   indesejado. Apontei o problema e pedi um texto simples.

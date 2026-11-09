@@ -101,7 +101,7 @@ Produto (id, total)
 7. **A entrada cria o produto** se ele ainda não existir, porque o case não tem uma função de cadastro.
 8. **Usei os mesmos nomes do enunciado** em funções, rotas e no Swagger: `entrada`, `saida`, `reservar`, `bloquear`,
    `liberar` e `consultar`.
-9. **Testes com banco isolado:** cada teste usa um banco novo, que é apagado no fim. São 113 casos (ver `TESTES.md`).
+9. **Testes com banco isolado:** cada teste usa um banco novo, que é apagado no fim. São 122 casos (ver `TESTES.md`).
 
 ## 4. Premissas
 
@@ -113,6 +113,8 @@ Produto (id, total)
   reserva.
 - A saída só retira unidades **disponíveis**. As reservadas e as bloqueadas não são tocadas.
 - Quem reserva ou bloqueia guarda o `id` recebido (e há as listagens por produto para o caso de perdê-lo).
+- Cada operação aceita de **1 a 1.000.000** unidades. O enunciado não define um valor; escolhi esse teto para barrar
+  números absurdos (que davam erro no banco). Ele é fácil de mudar (`QUANTIDADE_MAXIMA`, em `services.py`).
 - Não há login nem controle de acesso. As datas são gravadas em UTC (horário universal).
 
 ## 5. Limitações conhecidas
@@ -127,8 +129,6 @@ Produto (id, total)
   caracteres. Um formato definido ajudaria nas validações e nos testes. Os `id` de reservas e bloqueios são gerados
   pelo próprio sistema.
 - **A trava só funciona em uma instância.** Se o sistema rodar em vários processos ao mesmo tempo, ela não protege.
-- **Não há limite máximo de quantidade.** Um número gigante (acima de 9 quintilhões) passa na validação e dá erro
-  no banco, e a API deve responder com erro 500. Isso está registrado em um teste marcado como "falha esperada".
 - **A consulta de um produto fica mais lenta quanto mais reservas ele tem.** O código carrega todas as reservas e
   bloqueios do produto (inclusive os já liberados) e soma. Com milhões de registros, isso pesa.
 - **A listagem de produtos mostra só os 50 primeiros**, sem páginas e sem filtros.
@@ -172,9 +172,8 @@ criado sozinho na primeira vez. Para começar do zero, pare o sistema e apague e
 4. `Consultar produto`: total 100, disponível 60, reservada 30, bloqueada 10.
 5. `Liberar reserva` com o `id` guardado e consulte de novo: disponível 90.
 
-**Testes:** rode `pytest` (ou `pytest -v`). O resultado esperado é `112 passed, 1 xfailed`. O "xfailed" é o teste da
-quantidade gigante, que falha de propósito para registrar a limitação acima. Pode aparecer também um aviso amarelo
-sobre uma biblioteca do teste; ele não afeta o resultado.
+**Testes:** rode `pytest` (ou `pytest -v`). O resultado esperado é `122 passed`. Pode aparecer um aviso amarelo sobre uma biblioteca do
+teste; ele não afeta o resultado.
 
 ## 7. O que eu faria diferente em produção
 
@@ -182,7 +181,6 @@ sobre uma biblioteca do teste; ele não afeta o resultado.
 - Trocar o SQLite por um banco profissional, como o **PostgreSQL**, e deixar que ele proteja o produto: enquanto uma
   operação está em andamento, a linha do produto fica travada para as outras. Isso funciona mesmo com vários processos.
 - Testar esse cenário com o banco real.
-- Definir um limite máximo de quantidade.
 
 **Para continuar rápido com muitos dados**
 - Guardar já calculadas as quantidades reservada e bloqueada, atualizando-as junto com cada operação. Assim a consulta

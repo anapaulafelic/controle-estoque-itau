@@ -2,7 +2,7 @@
 
 Rodar tudo: `pytest -v`. Rodar um arquivo: `pytest tests/test_consistencia.py -v`.
 
-Total: 113 casos. A parametrização expande alguns testes em vários casos (por exemplo, o mesmo teste rodando nas 4 operações).
+Total: 122 casos. A parametrização expande alguns testes em vários casos (por exemplo, o mesmo teste rodando nas 4 operações).
 
 ## Como o banco é isolado
 
@@ -12,7 +12,7 @@ Total: 113 casos. A parametrização expande alguns testes em vários casos (por
 
 ## Mapa dos testes
 
-### `test_servicos.py`: regras de negócio, direto no `services.py` (48)
+### `test_servicos.py`: regras de negócio, direto no `services.py` (51)
 
 | Teste | Objetivo |
 |---|---|
@@ -33,7 +33,8 @@ Total: 113 casos. A parametrização expande alguns testes em vários casos (por
 | liberar_reserva_ou_bloqueio_inexistente | Id desconhecido dá "não encontrada" |
 | reserva_e_bloqueio_nao_se_liberam_pelo_id_um_do_outro | O id de uma reserva não serve para liberar bloqueio, e vice-versa |
 | cenario_completo_do_exemplo | O exemplo 100 / 30 / 10 / 60 de ponta a ponta |
-| quantidade_invalida_e_rejeitada (5 casos) | Zero, negativo, `True`, decimal e texto são recusados na entrada |
+| quantidade_invalida_e_rejeitada (7 casos) | Zero, negativo, `True`, decimal, texto e valores acima do limite (inclusive 2⁶³) são recusados na entrada |
+| quantidade_no_limite_maximo_e_aceita | Valor-limite: exatamente 1.000.000 unidades é aceito |
 | operacoes_em_produto_inexistente | Saída, reserva, bloqueio, consulta e listagens dão "produto não encontrado" |
 | consultar_reserva_e_bloqueio_por_id | Consulta por id, com e sem sucesso |
 | listar_reservas / listar_bloqueios_com_filtro | O filtro de ativos mostra só os não liberados |
@@ -44,11 +45,11 @@ Total: 113 casos. A parametrização expande alguns testes em vários casos (por
 | entrada_rejeita_id_de_produto_invalido (12 casos) | Espaço, aspas, SQL injection, acento, vazio e mais de 64 caracteres são recusados e não criam produto |
 | entrada_aceita_id_de_produto_valido (4 casos) | Ids válidos passam, inclusive com 64 caracteres |
 
-### `test_consistencia.py`: depois de um erro, o estoque fica como estava (21)
+### `test_consistencia.py`: depois de um erro, o estoque fica como estava (25)
 
 | Teste | Objetivo |
 |---|---|
-| quantidade_invalida_em_qualquer_operacao_nao_altera_o_estoque (12) | 3 quantidades inválidas (0, -1, `True`) × 4 operações. Sem a validação, `saida(-1)` aumentaria o estoque |
+| quantidade_invalida_em_qualquer_operacao_nao_altera_o_estoque (16) | 4 quantidades inválidas (0, -1, `True` e acima do limite) × 4 operações. Sem a validação, `saida(-1)` aumentaria o estoque |
 | pedido_acima_do_disponivel_nao_altera_o_estoque (3) | Pedir uma unidade a mais que o disponível é recusado sem mudar nada |
 | liberar_reserva_duas_vezes... / liberar_bloqueio_duas_vezes... (2) | A segunda liberação é recusada e preserva o estoque e a data da primeira |
 | apos_varios_erros_seguidos_a_proxima_operacao_valida_funciona | Depois de erros de tipos diferentes o estoque é o mesmo e o próximo pedido válido dá o resultado exato |
@@ -70,7 +71,7 @@ Total: 113 casos. A parametrização expande alguns testes em vários casos (por
 | cada_teste_comeca_com_o_banco_vazio (3 repetições) | O mesmo teste, repetido, sempre parte do zero |
 | a_api_grava_no_banco_isolado | As requisições HTTP caem no banco temporário |
 
-### `test_api.py`: rotas, códigos HTTP e formato (38)
+### `test_api.py`: rotas, códigos HTTP e formato (40)
 
 | Teste | Objetivo |
 |---|---|
@@ -86,11 +87,15 @@ Total: 113 casos. A parametrização expande alguns testes em vários casos (por
 | swagger_usa_os_nomes_do_case | O Swagger mostra Entrada, Saída, Reservar, Bloquear, Liberar, Consultar |
 | quantidade_invalida_retorna_422_em_toda_rota_de_escrita (8) | 0 e -5 nas 4 rotas que mexem no estoque, e o estoque fica igual |
 | operacao_em_produto_inexistente_retorna_404... (3) | Saída, reserva e bloqueio em produto inexistente: 404 e nada criado |
-| quantidade_gigante_deveria_retornar_422 (xfail) | Defeito conhecido, ver abaixo |
+| quantidade_acima_do_limite_retorna_422 (2) | 1.000.001 e 2⁶³ dão 422 e nada é criado (antes, 2⁶³ dava erro 500) |
+| quantidade_no_limite_maximo_e_aceita | Exatamente 1.000.000 unidades é aceito pela API |
 
-## Defeito conhecido (marcado como `xfail`)
+## Limite de quantidade
 
-Uma quantidade acima de 2⁶³−1 (9.223.372.036.854.775.807) passa no Pydantic, que não tem limite máximo, e estoura no SQLite com `OverflowError` (confirmado gravando direto com `sqlite3`); no app isso deve resultar em erro 500. A correção é um limite máximo em `Quantidade` (`schemas.py`) e em `_validar_quantidade` (`services.py`). Quando for implementada, o teste passa a dar XPASS e o marcador `xfail` deve ser removido.
+Cada operação aceita de 1 a 1.000.000 unidades (`QUANTIDADE_MAXIMA`, em `services.py`). O valor é uma premissa minha, porque
+o enunciado não define um. O teto existe porque uma quantidade acima de 2⁶³−1 (9.223.372.036.854.775.807) passava na
+validação e estourava no SQLite com `OverflowError` (confirmado gravando direto com `sqlite3`), o que resultava em erro 500. Hoje a API
+responde 422, e os testes acima verificam o limite exato e o primeiro valor acima dele.
 
 ## Como provar que os testes protegem (teste de mutação manual)
 
@@ -100,6 +105,7 @@ Estrague o código de propósito, rode `pytest` e confira se algum teste falha. 
 |---|---|
 | Em `saida`, apagar `_validar_quantidade(quantidade)` | `quantidade_invalida_em_qualquer_operacao...[saida-*]` |
 | Em `reservar`, apagar `_validar_quantidade(quantidade)` | `quantidade_invalida_em_qualquer_operacao...[reservar-*]` |
+| Em `_validar_quantidade`, tirar o teto (`<= QUANTIDADE_MAXIMA`) | `quantidade_invalida_em_qualquer_operacao...[*-1000001]` e `quantidade_invalida_e_rejeitada` |
 | Em `listar_reservas`, devolver as reservas de todos os produtos | `produtos_sao_independentes_entre_si` |
 | Em `liberar_reserva`, gravar `liberada_em` antes de levantar `ReservaJaLiberada` | `liberar_reserva_duas_vezes_nao_altera...` |
 | Em `_exigir_disponivel`, trocar `>` por `>=` | `pode_reservar_exatamente_o_disponivel` e outros |

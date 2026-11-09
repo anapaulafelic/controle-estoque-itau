@@ -55,7 +55,7 @@ def chamar(db, operacao, quantidade):
 
 # ------------------------------------------------------------------ pedidos recusados não alteram o estoque
 
-@pytest.mark.parametrize("quantidade", [0, -1, True])
+@pytest.mark.parametrize("quantidade", [0, -1, True, services.QUANTIDADE_MAXIMA + 1])
 @pytest.mark.parametrize("operacao", ["entrada", "saida", "reservar", "bloquear"])
 def test_quantidade_invalida_em_qualquer_operacao_nao_altera_o_estoque(db, operacao, quantidade):
     """A validação vale em TODAS as operações. Sem ela, saida(-1) aumentaria o estoque."""

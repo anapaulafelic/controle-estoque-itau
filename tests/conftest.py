@@ -27,7 +27,10 @@ def db(session_factory):
 
 @pytest.fixture
 def client(session_factory):
-    """Cliente HTTP de teste; cada requisição abre uma sessão no banco temporário."""
+    """Cliente HTTP de teste; cada requisição abre uma sessão no banco temporário.
+
+    O TestClient é usado SEM `with`, então o lifespan do app não roda e o estoque.db real nunca é criado.
+    """
 
     def _get_db():
         with session_factory() as sessao:

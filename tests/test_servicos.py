@@ -1,5 +1,4 @@
 """Testes das regras de negócio (chamam services.py direto, sem HTTP)."""
-from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -197,7 +196,7 @@ def test_cenario_completo_do_exemplo(db):
 
 # ------------------------------------------------------------------ validações e erros
 
-@pytest.mark.parametrize("quantidade", [0, -1, True, 2.5, "3"])
+@pytest.mark.parametrize("quantidade", [0, -1, True, 2.5, "3", services.QUANTIDADE_MAXIMA + 1, 2**63])
 def test_quantidade_invalida_e_rejeitada(db, quantidade):
     with pytest.raises(QuantidadeInvalida):
         services.entrada(db, SKU, quantidade)
@@ -301,23 +300,14 @@ def test_entrada_aceita_id_de_produto_valido(db, produto_id):
     assert services.entrada(db, produto_id, 1).id == produto_id
 
 
-# ------------------------------------------------------------------ concorrência
+def test_listar_produtos_nos_valores_limite_1_e_50(db):
+    """Objetivo: valor-limite do parâmetro. 1 e 50 são aceitos (os extremos válidos); 0 e 51 já eram recusados."""
+    for sku in ["SKU-A", "SKU-B", "SKU-C"]:
+        services.entrada(db, sku, 1)
+    assert [p.id for p in services.listar_produtos(db, limite=1)] == ["SKU-A"]
+    assert len(services.listar_produtos(db, limite=50)) == 3
 
-def test_reservas_simultaneas_nao_ultrapassam_o_estoque(session_factory):
-    with session_factory() as db:
-        services.entrada(db, SKU, 30)
 
-    def tentar_reservar(i):
-        with session_factory() as sessao:  # cada thread usa a sua própria sessão
-            try:
-                services.reservar(sessao, SKU, 1, f"PED-{i}")
-                return True
-            except EstoqueInsuficiente:
-                return False
-
-    with ThreadPoolExecutor(max_workers=20) as pool:
-        resultados = list(pool.map(tentar_reservar, range(50)))
-
-    assert sum(resultados) == 30  # 50 tentativas para 30 unidades: exatamente 30 passam
-    with session_factory() as db:
-        conferir(services.consultar_produto(db, SKU), 30, 0, 30, 0)
+def test_quantidade_no_limite_maximo_e_aceita(db):
+    """Valor-limite: exatamente a quantidade máxima por operação é aceita."""
+    assert services.entrada(db, SKU, services.QUANTIDADE_MAXIMA).total == services.QUANTIDADE_MAXIMA

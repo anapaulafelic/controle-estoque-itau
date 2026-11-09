@@ -1,6 +1,8 @@
 """Testes da API (HTTP): rotas, códigos de status e formato das respostas."""
 import pytest
 
+from app.services import QUANTIDADE_MAXIMA
+
 
 def test_fluxo_completo_pela_api(client):
     resposta = client.post("/produtos/SKU-001/entrada", json={"quantidade": 100})
@@ -177,3 +179,43 @@ def test_swagger_usa_os_nomes_do_case(client):
     }
     for nome in ["Entrada", "Saída", "Reservar", "Bloquear", "Liberar reserva", "Liberar bloqueio", "Consultar produto"]:
         assert nome in resumos
+
+
+# ------------------------------------------------------------------ as outras rotas também recusam
+
+ROTAS_DE_ESCRITA = [
+    ("/produtos/SKU-001/entrada", {}),
+    ("/produtos/SKU-001/saida", {}),
+    ("/produtos/SKU-001/reservas", {"solicitacao_id": "PED-1"}),
+    ("/produtos/SKU-001/bloqueios", {}),
+]
+
+
+@pytest.mark.parametrize("quantidade", [0, -5])
+@pytest.mark.parametrize("rota, extra", ROTAS_DE_ESCRITA, ids=["entrada", "saida", "reservas", "bloqueios"])
+def test_quantidade_invalida_retorna_422_em_toda_rota_de_escrita(client, rota, extra, quantidade):
+    """Antes só a rota de entrada era testada. As quatro rotas que mexem no estoque recusam e o estoque fica igual."""
+    client.post("/produtos/SKU-001/entrada", json={"quantidade": 10})
+    assert client.post(rota, json={"quantidade": quantidade, **extra}).status_code == 422
+    assert client.get("/produtos/SKU-001").json()["disponivel"] == 10
+
+
+@pytest.mark.parametrize("rota", ["saida", "reservas", "bloqueios"])
+def test_operacao_em_produto_inexistente_retorna_404_e_nao_cria_produto(client, rota):
+    corpo = {"quantidade": 1, "solicitacao_id": "PED-1"}
+    assert client.post(f"/produtos/NAO-EXISTE/{rota}", json=corpo).status_code == 404
+    assert client.get("/produtos").json() == []
+
+
+@pytest.mark.parametrize("quantidade", [QUANTIDADE_MAXIMA + 1, 2**63])
+def test_quantidade_acima_do_limite_retorna_422(client, quantidade):
+    """Sem o limite, 2**63 passava na validação e estourava no banco (erro 500). Agora é recusado com 422."""
+    resposta = client.post("/produtos/SKU-001/entrada", json={"quantidade": quantidade})
+    assert resposta.status_code == 422
+    assert client.get("/produtos/SKU-001").status_code == 404  # nada foi criado
+
+
+def test_quantidade_no_limite_maximo_e_aceita(client):
+    resposta = client.post("/produtos/SKU-001/entrada", json={"quantidade": QUANTIDADE_MAXIMA})
+    assert resposta.status_code == 200
+    assert resposta.json()["total"] == QUANTIDADE_MAXIMA

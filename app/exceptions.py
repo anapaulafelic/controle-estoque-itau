@@ -6,8 +6,8 @@ class ErroDeDominio(Exception):
 
 
 class QuantidadeInvalida(ErroDeDominio):
-    def __init__(self, quantidade):
-        super().__init__(f"Quantidade inválida: {quantidade!r}. Informe um inteiro maior que zero.")
+    def __init__(self, quantidade, maximo):
+        super().__init__(f"Quantidade inválida: {quantidade!r}. Informe um inteiro de 1 a {maximo}.")
 
 
 class ProdutoIdInvalido(ErroDeDominio):

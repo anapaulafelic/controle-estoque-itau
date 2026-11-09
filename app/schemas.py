@@ -8,11 +8,17 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints
 
 from app.models import StatusBloqueio, StatusReserva
+from app.services import QUANTIDADE_MAXIMA
 
-# StrictInt: aceita só inteiro de verdade (rejeita "10", 2.5 e true).
+# StrictInt: aceita só inteiro de verdade (rejeita "10", 2.5 e true). De 1 até o máximo por operação.
 Quantidade = Annotated[
     StrictInt,
-    Field(gt=0, description="Quantidade de unidades (inteiro maior que zero)", examples=[10]),
+    Field(
+        gt=0,
+        le=QUANTIDADE_MAXIMA,
+        description=f"Quantidade de unidades (inteiro de 1 a {QUANTIDADE_MAXIMA})",
+        examples=[10],
+    ),
 ]
 Texto = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 

@@ -45,6 +45,10 @@ PADRAO_PRODUTO_ID = r"^[A-Za-z0-9_-]{1,64}$"
 # Teto da listagem de produtos (a paginação completa fica como evolução).
 LIMITE_MAXIMO_LISTAGEM = 50
 
+# Quantidade máxima por operação. O case não define um valor; escolhi este como premissa.
+# Sem um teto, um número gigante (acima de 2**63 - 1) passava na validação e estourava no SQLite (erro 500).
+QUANTIDADE_MAXIMA = 1_000_000
+
 # Concorrência: "ler o disponível e depois alterar" não é atômico. Sem proteção, duas
 # requisições simultâneas poderiam ler disponível = 10 e as duas reservarem 8.
 # Este lock faz uma operação por vez enxergar o resultado da anterior.
@@ -55,8 +59,8 @@ _lock = threading.Lock()
 
 def _validar_quantidade(quantidade) -> None:
     # type(...) is not int também rejeita True/False (bool é subclasse de int) e floats.
-    if type(quantidade) is not int or quantidade <= 0:
-        raise QuantidadeInvalida(quantidade)
+    if type(quantidade) is not int or not 1 <= quantidade <= QUANTIDADE_MAXIMA:
+        raise QuantidadeInvalida(quantidade, QUANTIDADE_MAXIMA)
 
 
 def _validar_produto_id(produto_id) -> None:

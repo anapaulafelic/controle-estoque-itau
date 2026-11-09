@@ -1,124 +1,68 @@
-# Uso de IA
+# Uso de Inteligência Artificial
 
-Usei o Claude (Anthropic) em uma conversa contínua, como parceiro para analisar o problema, gerar o código em
-etapas e revisar o resultado. As decisões de escopo e de design foram minhas; li o que foi gerado, perguntei o que
-não entendi, rodei os testes na minha máquina e corrigi o rumo quando o resultado não servia.
+Este documento descreve como as ferramentas de Inteligência Artificial foram utilizadas como aceleradoras no desenvolvimento do case prático de Controle de Estoque, detalhando os modelos empregados, os principais prompts, os ganhos de produtividade, decisões técnicas ajustadas e limitações identificadas durante o processo.
 
-Os prompts abaixo são os que tiveram impacto relevante, transcritos com pequenas correções de ortografia.
+---
 
-## Principais prompts
+## 1. Ferramentas e Modelos Utilizados
 
-### 1. Modelagem, antes de qualquer código
+- **Claude** (Anthropic) - codificação
+- **ChatGPT** (OpenAI) - estudo inicial de caso, regras de negócios, dúvidas técnicas e plano de desenvolvimento
+- **Gemini** (Google) - validação e dúvidas técnicas
 
-> Atue como engenheiro de software sênior especialista em Python. Analise o enunciado do case de Controle de Estoque,
-> sem gerar código. Identifique entidades, relacionamentos, regras de negócio, validações e situações excepcionais.
-> Proponha uma modelagem simples que permita múltiplas reservas e bloqueios por produto, com identificação individual
-> e liberação independente. Explique as decisões e destaque o que preciso saber defender na entrevista.
+---
 
-**Impacto:** definiu as entidades e a regra central `total = disponível + reservada + bloqueada`, e propôs calcular as
-quantidades a partir dos itens ativos em vez de armazená-las.
+## 2. Onde a IA mais ajudou
 
-### 2. Projeto em etapas e arquitetura simples
+- **Modelagem de Dados e Relacionamentos:** Apoio na interpretação dos requisitos de múltiplas reservas e bloqueios simultâneos por produto, contribuindo para a definição das entidades Produto, Reserva e Bloqueio, seus relacionamentos e identificações individuais. A discussão também abordou a liberação independente de cada registro.
 
-> Com base na modelagem aprovada, proponha um projeto Python com FastAPI, SQLAlchemy, Pydantic e SQLite. Separe rotas,
-> modelos, schemas, conexão com banco e regras de negócio. Mantenha a arquitetura simples, adequada a um case de até
-> 3 horas. Evite abstrações desnecessárias. Gere os arquivos em etapas e explique a responsabilidade de cada um. Vamos
-> usar Swagger para apresentar ao recrutador no final. Lembre de manter uma arquitetura bem simples (pedido do case),
-> preciso saber explicar e compreender o código, e não montar uma arquitetura complexa.
+- **Consistência e Concorrência:** Apoio na compreensão dos riscos de condições de corrida (race conditions) em operações simultâneas de estoque e das estratégias para preservar a consistência dos dados, considerando transações e mecanismos de controle de concorrência.
 
-**Impacto:** gerou a estrutura de quatro camadas, com a explicação da responsabilidade de cada arquivo.
+- **Regras de Negócio e Testes:** Apoio na identificação de cenários positivos, negativos e excepcionais, incluindo tentativas de movimentação acima da quantidade disponível, liberações duplicadas e operações inválidas. Também contribuiu para estruturar a estratégia de testes automatizados.
 
-### 3. Dúvida de design: como achar os ids?
+- **Organização da Arquitetura e Separação de Responsabilidades:** Discussão sobre a divisão entre rotas, serviços, modelos e schemas, buscando manter as regras de negócio centralizadas e independentes da camada de exposição da API e da persistência.
 
-> Perfeito. No sistema, não há uma opção para listar. Ele pressupõe que o id do produto, das reservas e dos bloqueios
-> são conhecidos. Como seria a solução para esse caso num sistema real? Uma opção de listagem geral? Em um sistema
-> muito grande, isso teria algum impacto de performance? Não precisa gerar código, só tirar essa dúvida, de forma
-> direta e breve.
+- **Avaliação de Alternativas e Alinhamento de Escopo:** Discussão sobre alternativas de arquitetura e tecnologias, considerando o prazo e os objetivos do case. A análise priorizou uma solução simples, organizada e testável, evitando complexidade desnecessária, como microsserviços e mensageria.
 
-**Impacto:** levou às listagens por produto e à anotação, no README, do custo do resumo e da paginação como melhoria.
+---
 
-### 4. Refatoração para o vocabulário do case
+## 3. Principais Prompts Utilizados
 
-> Vamos ajustar as funções. Refatore. Você alterou o nome das funcionalidades solicitadas no case. Vamos manter os
-> nomes. Reservas, bloqueios... Não vamos unificar liberar retenções para reservas e bloqueios, pois, como melhoria
-> futura, eles possuirão passos distintos. Da reserva, no futuro, será possível alterar para efetivado, mandando o
-> total da reserva diretamente para a saída. Então mantenha o padrão DDD, com os nomes propostos no case, a menos que
-> seja uma funcionalidade nova que estamos implementando.
+### Prompt 1: Modelagem de Dados e Regras de Negócio
 
-**Impacto:** Reserva e Bloqueio viraram entidades separadas, cada uma com a sua liberação, e os nomes voltaram a ser os
-do enunciado.
+> _"Atue como engenheiro de software sênior especialista em Python. Analise o enunciado do case de Controle
+> de Estoque, sem gerar código. Identifique entidades, relacionamentos, regras de negócio, validações e situações excepcionais.Proponha uma modelagem simples que permita múltiplas reservas e bloqueios por produto, com identificação individual e liberação independente. Explique as decisões.
+> "_
 
-### 5. Segurança do identificador e listagem simplificada
+### Prompt 2: Estratégia de Concorrência e Tratamento de Conflitos
 
-> 1 - Entendi, nesse caso ele deveria permitir. Vamos ajustar só para não permitir caracteres perigosos em
-> cibersegurança, evitando SQL injection, e não permitir textos com espaços. Consegui cadastrar um "teste teste" como
-> código do produto. 2 - Vamos ajustar o campo listar produtos, para simplificar o modelo. Deixe só a opção de quantidade
-> de itens até 50. E só o campo número. Uma paginação completa deverá entrar com os itens de melhoria no README.
+> _"Atue como engenheiro de software sênior e analise as regras de negócio de uma API de Controle de Estoque. Identifique possíveis inconsistências em operações simultâneas, reservas, bloqueios e liberações.
+> Avalie os riscos de concorrência e indique como preservar a consistência dos dados utilizando
+> transações e recursos do banco de dados. Não gere código inicialmente. Explique os cenários, as alternativas e suas limitações."_
 
-**Impacto:** o identificador do produto passou a aceitar só letras, números, hífen e sublinhado (até 64), e a listagem
-ficou com um único parâmetro, `limite`.
+### Prompt 3: Estratégia e Isolamento de Testes
 
-### 6. Revisão dos testes como QA
+> _"Atue como engenheiro de QA em Python/pytest. Analise a implementação do estoque e crie cenários de teste para cenários positivos, negativos e excepcionais (liberações duplicadas, saldo insuficiente, quantidades inválidas). Utilize banco isolado em memória."_
 
-> Analise a eficiência dos testes já criados. Atue como engenheiro de QA especializado em Python e pytest. Analise a
-> implementação e avalie os testes criados para cenários positivos, negativos e excepcionais. Teste consistência após
-> operações inválidas, múltiplas reservas, bloqueios, liberações duplicadas e quantidades inválidas. Utilize banco
-> isolado para os testes e explique o objetivo de cada caso.
+### Prompt 4: Revisão Técnica e Qualidade de Código
 
-**Impacto:** apontou lacunas reais nos testes e um defeito no código (ver a análise abaixo). Depois perguntei se a
-quantidade de testes não seria exagerada e pedi para manter o simples: a suíte foi reduzida de 196 para 113 casos (hoje são 122, depois do limite de quantidade).
+> _"Faça uma revisão técnica como engenheiro de software sênior. Avalie organização, legibilidade, segurança, validações, tratamento de erros, consistência, transações e configuração por ambiente. Verifique credenciais expostas, segurança, duplicação e complexidade excessiva. Não reescreva tudo: liste problemas por prioridade, riscos e correções pontuais."_
 
-## Análise
+---
 
-### Onde a IA mais ajudou
+## 4. Sugestões de IA Modificadas ou Rejeitadas
 
-- **Modelagem.** Identificar a regra central e a ideia de derivar as quantidades dos itens ativos, que elimina a
-  possibilidade de os números divergirem.
-- **Velocidade com explicação.** Gerar o esqueleto, o código e os testes em etapas, sempre dizendo a responsabilidade
-  de cada arquivo e o que eu precisaria defender na entrevista.
-- **Revisão crítica do próprio trabalho.** No papel de QA, a IA encontrou fraquezas nos testes que ela mesma tinha
-  gerado e um defeito no código (descritos abaixo), e criou uma tabela de defeitos para injetar de propósito
-  (`TESTES.md`).
+- **Camada de Repositório (Repository Pattern):** A IA sugeriu criar uma estrutura formal de repositórios (`Repository` + `Unit of Work`). **Decisão:** Optei por rejeitar essa abstração e acessar a sessão do SQLAlchemy diretamente na camada de serviço (`services.py`) para manter o desenvolvimento simples, legível e focado no limite de tempo de 3 horas.
+- **Reserva e bloqueio unificados:** A IA juntou os dois itens com uma única forma de liberar. **Decisão:** Mantive as duas entidades separadas, dessa forma reservas pode receber o passo "efetivar" previsto como melhoria.
+- **Nomes de funções e rotas:** A IA criou nomes próprios, fugindo do escopo do case. **Decisão:** Solicitei refatoração e adequação ao escopo aprovado (Entrada, Saída, Reservar, Bloquear, Liberar, Consultar).
+- **Quantidade de testes:** A IA chegou a quase 200 testes. **Decisão:** Apesar de importantes e válidos para o projeto, aumentou a complexidade e implementou funcionalidades em um nível muito superior ao meu conhecimento e ao escopo do case. Pedi para manter cobertura para as principais funções solicitadas e para as relacionadas a segurança.
+- **Código do produto:** A IA entendeu que aceitar qualquer texto neste campo era coerente.**Decisão:** Optei por restringir os caracteres por segurança, evitando códigos com espaços e caracteres maliciosos.
 
-### Onde discordei da IA (sugestões que modifiquei ou não usei)
+---
 
-- **Nomenclatura de funções e rotas.** A IA tinha criado nomes próprios. Pedi para voltar aos nomes do enunciado
-  (Entrada, Saída, Reservar, Bloquear, Liberar e Consultar) nas funções, nas rotas e no Swagger. Motivo: é o
-  vocabulário do case, o que facilita a avaliação e a minha explicação. Os nomes novos ficaram só nas funções que o
-  case não pede (as listagens).
-- **Estrutura do modelo: reserva e bloqueio juntos.** A IA unificou os dois numa só "retenção", com uma única forma de
-  liberar. Não usei. A reserva vai ganhar um passo a mais (efetivar, mandando o total da reserva direto para a saída)
-  que o bloqueio não tem, então juntá-los obrigaria a desfazer isso depois. Pedi duas entidades separadas, cada uma
-  com a sua liberação.
-- **Quantidade e escolha dos testes.** A IA chegou a 196 casos, com técnicas que eu não conseguiria explicar bem
-  (leitura do banco por SQL direto, sequência de operações sorteadas, testes das regras do banco). Achei
-  desproporcional para um case de 3 horas e pedi para manter o simples. Ficaram 113 casos na época, e mantive os testes
-  principais, que consigo defender: as regras do enunciado, os erros, a consistência depois de uma operação recusada,
-  a liberação repetida e os pedidos simultâneos.
-- **Paginação completa na listagem de produtos.** Simplifiquei para um parâmetro `limite` de até 50, por pragmatismo.
-  A paginação completa ficou como melhoria no README.
-- **Código do produto livre.** A IA explicou que aceitar qualquer texto era coerente com o desenho (a entrada cria o
-  produto). Eu decidi restringir os caracteres por segurança e para evitar códigos com espaços, e a IA implementou uma
-  lista de caracteres permitidos.
+## 5. Erros, Limitações e Problemas Identificados
 
-### Erros, limitações e problemas que identifiquei
-
-- **Desvio do enunciado.** A IA renomeou as funcionalidades do case e juntou reserva e bloqueio (ver acima). Percebi
-  ao revisar o Swagger e pedi a correção.
-- **Comandos para o ambiente errado.** As instruções iniciais usavam sintaxe de Bash (`&&`, `source`) e falharam no
-  meu PowerShell. A IA corrigiu para o Windows.
-- **Erro de digitação no modelo.** Um `order_by` apontava para `Bloqueio.criada_em`, mas a coluna se chama
-  `criado_em`. Foi encontrado na revisão e corrigido.
-- **Teste de pedidos simultâneos fraco.** O primeiro teste gerado passaria mesmo sem a trava (`Lock`), porque o
-  intervalo em que o conflito acontece é muito curto. A IA propôs alargá-lo de propósito, e agora o teste falha se a
-  trava for removida.
-- **Validação só na entrada.** Os testes conferiam quantidade inválida apenas na entrada, então `saida(-1)` poderia
-  aumentar o estoque sem que nenhum teste percebesse. Foi corrigido com testes nas quatro operações.
-- **Defeito no código encontrado pela revisão.** Uma quantidade acima de 2⁶³−1 passava na validação e estourava no
-  SQLite (erro 500). Primeiro foi registrado como teste de "falha esperada"; depois foi corrigido com um limite de
-  1.000.000 unidades por operação, e os testes passaram a verificar o limite.
-- **A IA não executava o projeto.** O ambiente dela não tinha FastAPI nem SQLAlchemy, então toda execução real dos
-  testes foi minha: 38 passaram na primeira versão e 112 passaram (mais 1 de "falha esperada") na versão anterior ao limite de quantidade. A IA só validou a
-  lógica dos testes contra um modelo em memória.
-- **Exemplo no Swagger.** A primeira tentativa de mostrar um valor de exemplo no id do produto gerou um seletor
-  indesejado. Apontei o problema e pedi um texto simples.
+- **Desvio do enunciado.** A IA renomeou as rotas do case e uniu reserva e bloqueio na mesma função, sem eu pedir. Percebi ao revisar o Swagger e pedi a correção (ver seção 4).
+- **Campo desnecessário no Swagger.** A primeira tentativa de mostrar um exemplo no id do produto criou um campo seletor sem valores. Troquei por um exemplo fixo e uma descrição no próprio campo.
+- **Quantidade gigante gerava erro 500.** Um valor acima de 64 bits (2⁶³−1) passava na validação e estourava no banco. Defini o limite de 1.000.000 por operação, já que o case não define valor máximo.
+- **Execução/avaliação dos testes:** A IA não executava o projeto, a menos que eu desse permissão de acesso e execução na minha máquina. Por segurança, preferi rodar os testes no terminal localmente e compartilhar com ela somente os resultados.

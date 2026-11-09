@@ -1,7 +1,7 @@
 """Rotas HTTP. Cada rota só converte HTTP <-> chamada ao serviço; nenhuma regra de negócio aqui.
 
 Os nomes (resumos no Swagger e funções) seguem o case: Entrada, Saída, Reservar, Bloquear,
-Liberar reserva, Liberar bloqueio e Consultar. As listagens são funcionalidades novas.
+Liberar reserva, Liberar bloqueio e Consultar. As listagens são funcionalidades novas para facilitar a navegação entre os produtos.
 """
 from typing import Annotated
 
@@ -27,7 +27,7 @@ BloqueioId = Annotated[str, Path(description="Identificador do bloqueio")]
 
 # Respostas de erro documentadas no Swagger.
 NAO_ENCONTRADO = {"model": schemas.ErroOut, "description": "Produto, reserva ou bloqueio não encontrado"}
-CONFLITO = {"model": schemas.ErroOut, "description": "Regra violada (estoque insuficiente ou já liberado)"}
+CONFLITO = {"model": schemas.ErroOut, "description": "Operação não permitida (estoque insuficiente ou já liberado)"}
 
 
 # ------------------------------------------------------------------ Estoque
@@ -81,7 +81,7 @@ def listar_produtos(
 ):
     """Lista os primeiros produtos, ordenados por id, com suas quantidades.
 
-    Versão simples, sem paginação completa (evolução prevista): devolve no máximo `limite` itens.
+    Versão simples, sem paginação completa (evolução prevista).
     """
     return services.listar_produtos(db, limite)
 

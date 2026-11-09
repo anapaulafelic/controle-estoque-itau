@@ -28,7 +28,7 @@ def agora_utc() -> datetime:
 class StatusReserva(str, Enum):
     ATIVA = "ATIVA"
     LIBERADA = "LIBERADA"
-    # Evolução prevista: EFETIVADA (as unidades da reserva saem do estoque).
+    # Evolução prevista: EFETIVADA (as unidades da reserva saem do estoque, mas mantém o registro para rastreabilidade).
 
 
 class StatusBloqueio(str, Enum):
